@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Famwell</title>
+  
+  <!-- 1. Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 2. React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  
+  <!-- 3. Babel (to transpile JSX in the browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- 4. Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <!-- 5. Custom Styles & Font -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Custom scrollbar for a cleaner look */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d4d4d8;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a1a1aa;
+    }
+    ::-webkit-scrollbar-track {
+      background: #fafaf9;
+    }
+
+    /* Simple fade-in animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-amber-50">
+
+  <!-- This is where the React App will be mounted -->
+  <div id="root"></div>
+
+  <!-- 
+    6. React Application Code 
+  -->
+  <script type="text/babel">
+    // --- React Setup ---
+    // Added useRef for the new Icon component
+    const { useState, useMemo, useEffect, Fragment, useRef } = React;
+    const { createRoot } = ReactDOM;
+    const root = createRoot(document.getElementById('root'));
+
+    // --- REMOVED: API Call Helpers ---
+    // All Gemini API functions and schemas have been removed.
+
+    // --- NEW: Local Food Database ("Local AI") ---
+    const foodDatabase = {
+      // Keys are simple, lowercase terms to search for.
+      'roti': { name: 'Roti (1 medium)', calories: 100, protein: 3, carbs: 20, fats: 1 },
+      'dal': { name: 'Dal (1 katori)', calories: 150, protein: 7, carbs: 25, fats: 2 },
+      'rice': { name: 'Rice (1 katori)', calories: 130, protein: 3, carbs: 28, fats: 0.3 },
+      'sabzi': { name: 'Sabzi (1 katori)', calories: 120, protein: 3, carbs: 15, fats: 5 },
+      'curd': { name: 'Curd (1 katori)', calories: 60, protein: 3, carbs: 4, fats: 3 },
+      'tea': { name: 'Tea (1 cup)', calories: 40, protein: 1, carbs: 5, fats: 1 },
+      'pickle': { name: 'Pickle (1 tbsp)', calories: 20, protein: 0.1, carbs: 1, fats: 2 },
+      'idli': { name: 'Idli (1 piece)', calories: 40, protein: 1, carbs: 8, fats: 0.2 },
+      'poha': { name: 'Poha (1 plate)', calories: 250, protein: 5, carbs: 50, fats: 3 },
+      'banana': { name: 'Banana (1 medium)', calories: 105, protein: 1.3, carbs: 27, fats: 0.4 },
+      'chicken': { name: 'Chicken (100g)', calories: 165, protein: 31, carbs: 0, fats: 3.6 },
+      'egg': { name: 'Egg (1 large)', calories: 78, protein: 6, carbs: 0.6, fats: 5 },
+      'salad': { name: 'Salad (1 bowl)', calories: 50, protein: 2, carbs: 10, fats: 1 },
+      'apple': { name: 'Apple (1 medium)', calories: 95, protein: 0.5, carbs: 25, fats: 0.3 },
+      'milk': { name: 'Milk (1 glass)', calories: 150, protein: 8, carbs: 12, fats: 8 },
+    };
+
+
+    // --- NEW: Icon Component ---
+    // This component safely wraps the imperative lucide.createElement()
+    function Icon({ name, className = '' }) {
+      const ref = useRef(null);
+
+      // This effect runs when the icon 'name' or 'className' changes.
+      useEffect(() => {
+        if (ref.current && lucide && lucide.icons[name]) {
+          // Create the SVG icon node
+          const iconNode = lucide.createElement(lucide.icons[name]);
+
+          // Add all classes from the prop to the SVG node
+          if (className) {
+            className.split(' ').forEach(cls => {
+              if (cls) iconNode.classList.add(cls);
+            });
+          }
+          
+          // Clear any existing icon
+          ref.current.innerHTML = '';
+          
+          // Append the new icon node
+          ref.current.appendChild(iconNode);
+        } else if (ref.current) {
+          // Clear if no icon name
+          ref.current.innerHTML = '';
+        }
+      }, [name, className]); // Re-run if props change
+
+      // Render a simple span wrapper for React to manage.
+      // The `lineHeight: 1` fixes potential layout shifts.
+      return <span ref={ref} style={{ display: 'inline-block', lineHeight: 1 }} />;
+    }
+
+
+    // --- Initial Data ---
+    const initialFamilyData = {
+      'member-1': {
+        id: 'member-1',
+        name: 'Eliza',
+        avatar: 'https://placehold.co/100x100/d1fae5/34d399?text=E',
+        profile: {
+          physicalGoals: 'Run a 5k in under 30 minutes.',
+          healthIssues: 'Seasonal allergies.',
+          dietaryPreferences: 'None',
+          activityLevel: 'Moderate',
+          allergies: 'Pollen',
+          dailyStepsGoal: 10000,
+        },
+        foodLog: [
+          { id: 1, name: 'Morning Oatmeal', calories: 350, protein: 10, carbs: 60, fats: 8 },
+        ],
+        appointments: [
+          { id: 1, date: '2025-11-20', time: '10:00 AM', doctor: 'Dr. Smith', type: 'Annual Check-up' },
+        ],
+        medications: [
+          { id: 1, name: 'Vitamin D', dosage: '1000 IU', frequency: '1 per day', time: '09:00' },
+        ],
+        mentalHealthLog: [
+          { id: 1, date: '2025-11-10', mood: 'Happy', note: 'Feeling productive today.' },
+        ],
+        physicalHealthLog: [
+          { id: 1, date: '2025-11-10', type: 'Activity', title: 'Morning Walk', note: '30-minute walk in the park.', steps: 3500 },
+        ],
+      },
+      'member-2': {
+        id: 'member-2',
+        name: 'David',
+        avatar: 'https://placehold.co/100x100/cffafe/06b6d4?text=D',
+        profile: {
+          physicalGoals: 'Increase bicep strength, gain 5lbs of muscle.',
+          healthIssues: 'None.',
+          dietaryPreferences: 'High Protein',
+          activityLevel: 'Active',
+          allergies: 'None',
+          dailyStepsGoal: 5000,
+        },
+        foodLog: [
+          { id: 2, name: 'Chicken Salad', calories: 450, protein: 30, carbs: 20, fats: 25 },
+        ],
+        appointments: [],
+        medications: [],
+        mentalHealthLog: [],
+        physicalHealthLog: [
+          { id: 2, date: '2025-11-09', type: 'Symptom', title: 'Headache', note: 'Mild tension headache in the afternoon.' },
+        ],
+      },
+      'member-3': {
+        id: 'member-3',
+        name: 'Sam',
+        avatar: 'https://placehold.co/100x100/e0e7ff/6366f1?text=S',
+        profile: {
+          physicalGoals: 'Make the basketball team.',
+          healthIssues: 'Asthma (exercise-induced).',
+          dietaryPreferences: 'None',
+          activityLevel: 'Active',
+          allergies: 'Peanuts',
+          dailyStepsGoal: 8000,
+        },
+        foodLog: [],
+        appointments: [
+          { id: 2, date: '2025-11-25', time: '02:00 PM', doctor: 'Dr. Chen', type: 'Vaccination' },
+        ],
+        medications: [],
+        mentalHealthLog: [
+          { id: 2, date: '2025-11-09', mood: 'Tired', note: 'Long day at school.' },
+        ],
+        physicalHealthLog: [
+          { id: 3, date: '2025-11-10', type: 'Activity', title: 'Basketball Practice', note: '2 hours, intense drills.', steps: 6000 },
+        ],
+      },
+      'member-4': {
+        id: 'member-4',
+        name: 'rohit',
+        avatar: 'https://placehold.co/100x100/fecaca/991b1b?text=R',
+        profile: {
+          physicalGoals: 'To increase stamina',
+          healthIssues: 'None',
+          dietaryPreferences: 'Vegetarian',
+          activityLevel: 'Moderate',
+          allergies: 'None',
+          dailyStepsGoal: 8000,
+        },
+        foodLog: [],
+        appointments: [],
+        medications: [],
+        mentalHealthLog: [],
+        physicalHealthLog: [],
+      },
+    };
+
+    // --- NEW: Top-Level App Component ---
+    function App() {
+      const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+      // This function simulates a successful login
+      const handleLogin = () => {
+        setIsLoggedIn(true);
+      };
+
+      return (
+        <div className="h-screen w-full">
+          {!isLoggedIn ? (
+            <LoginPage onLogin={handleLogin} />
+          ) : (
+            <FamilyHealthApp />
+          )}
+        </div>
+      );
+    }
+
+    // --- NEW: Login Page Component ---
+    function LoginPage({ onLogin }) {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        // In a real app, you'd validate credentials here
+        onLogin();
+      };
+      
+      // Removed the global lucide.createIcons() call from here
+
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-green-800 p-4 font-inter">
+          <div className="w-full max-w-md rounded-xl bg-amber-50 p-8 shadow-2xl">
+            <div className="mb-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-600">
+                {/* Replaced <i> with <Icon> */}
+                <Icon name="shield-check" className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="mt-4 text-3xl font-bold text-green-900">Famwell</h1>
+              <p className="mt-2 text-green-700">Sign in to manage your family's health.</p>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-green-800">
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="block text-sm font-medium text-green-800">
+                    Password
+                  </label>
+                  <a href="#" className="text-sm font-medium text-green-600 hover:text-green-500">
+                    Forgot password?
+                  </a>
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                />
+              </div>
+              
+              <button
+                type="submit"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all"
+              >
+                Sign In
+              </button>
+            </form>
+            
+            <p className="mt-6 text-center text-sm text-green-700">
+              Don't have an account?{' '}
+              <a href="#" className="font-medium text-green-600 hover:text-green-500">
+                Sign Up
+              </a>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+
+    // --- Main App Component (Renamed) ---
+    function FamilyHealthApp() {
+      const [familyMembers, setFamilyMembers] = useState(initialFamilyData);
+      const [activeMemberId, setActiveMemberId] = useState('member-4'); // Start on rohit
+      const [currentView, setCurrentView] = useState('profile');
+      const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+      const [medicationAlert, setMedicationAlert] = useState(null); // { name: 'Vitamin D' }
+
+      const activeMember = useMemo(() => familyMembers[activeMemberId], [familyMembers, activeMemberId]);
+
+      // --- Medication Alarm Logic ---
+      useEffect(() => {
+        const checkTime = () => {
+          if (!activeMember) return;
+
+          const now = new Date();
+          const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          
+          // Check for medication alerts
+          const activeMeds = activeMember.medications || [];
+          for (const med of activeMeds) {
+            if (med.time === currentTime) {
+              // Prevent re-alerting for the same minute
+              if (medicationAlert?.name !== med.name) {
+                 setMedicationAlert({ name: med.name });
+                 // Auto-dismiss the alert after 10 seconds
+                 setTimeout(() => setMedicationAlert(null), 10000);
+              }
+            }
+          }
+        };
+        
+        // Check immediately on load/member switch, then every minute
+        checkTime(); 
+        const interval = setInterval(checkTime, 60000); // Check every 60 seconds
+
+        return () => clearInterval(interval);
+      }, [activeMember, medicationAlert]);
+
+      // --- Lucide Icon Renderer (REMOVED) ---
+      // All global lucide.createIcons() calls have been removed
+      // and replaced with the <Icon> component.
+
+
+      // --- Handlers ---
+      const handleLogFood = (foodItem) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            foodLog: [
+              ...prevFamily[activeMemberId].foodLog,
+              { ...foodItem, id: Date.now() },
+            ],
+          },
+        }));
+      };
+
+      const handleDeleteFood = (foodId) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            foodLog: prevFamily[activeMemberId].foodLog.filter(food => food.id !== foodId),
+          },
+        }));
+      };
+
+      const handleAddAppointment = (appointment) => {
+         setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            appointments: [
+              ...prevFamily[activeMemberId].appointments,
+              { ...appointment, id: Date.now() },
+            ],
+          },
+        }));
+      };
+
+      const handleDeleteAppointment = (appId) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            appointments: prevFamily[activeMemberId].appointments.filter(app => app.id !== appId),
+          },
+        }));
+      };
+      
+      const handleAddMedication = (medication) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            medications: [
+              ...prevFamily[activeMemberId].medications,
+              { ...medication, id: Date.now() },
+            ],
+          },
+        }));
+      };
+
+      const handleDeleteMedication = (medId) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            medications: prevFamily[activeMemberId].medications.filter(med => med.id !== medId),
+          },
+        }));
+      };
+
+      const handleLogMentalHealth = (logEntry) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            mentalHealthLog: [
+              ...prevFamily[activeMemberId].mentalHealthLog,
+              { ...logEntry, id: Date.now(), date: new Date().toLocaleDateString() },
+            ],
+          },
+        }));
+      };
+
+      const handleDeleteMentalHealth = (logId) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            mentalHealthLog: prevFamily[activeMemberId].mentalHealthLog.filter(log => log.id !== logId),
+          },
+        }));
+      };
+
+      const handleLogPhysicalHealth = (logEntry) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            physicalHealthLog: [
+              ...prevFamily[activeMemberId].physicalHealthLog,
+              { ...logEntry, id: Date.now(), date: new Date().toLocaleDateString() },
+            ],
+          },
+        }));
+      };
+
+      const handleDeletePhysicalHealth = (logId) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            physicalHealthLog: prevFamily[activeMemberId].physicalHealthLog.filter(log => log.id !== logId),
+          },
+        }));
+      };
+
+      const handleUpdateProfile = (data) => {
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [activeMemberId]: {
+            ...prevFamily[activeMemberId],
+            name: data.name, // Update top-level name
+            profile: {
+              ...prevFamily[activeMemberId].profile,
+              physicalGoals: data.physicalGoals,
+              healthIssues: data.healthIssues,
+              dietaryPreferences: data.dietaryPreferences,
+              activityLevel: data.activityLevel,
+              allergies: data.allergies,
+              dailyStepsGoal: parseInt(data.dailyStepsGoal, 10) || 8000, // Add step goal
+            }
+          },
+        }));
+      };
+
+      const handleAddMember = (name) => {
+        if (!name) return;
+        
+        const newId = `member-${Date.now()}`;
+        const initial = name.charAt(0).toUpperCase() || '?';
+        
+        const newMember = {
+          id: newId,
+          name: name,
+          avatar: `https://placehold.co/100x100/9ca3af/ffffff?text=${initial}`,
+          profile: {
+            physicalGoals: '',
+            healthIssues: '',
+            dietaryPreferences: 'None',
+            activityLevel: 'Moderate',
+            allergies: 'None',
+            dailyStepsGoal: 8000, // Default step goal
+          },
+          foodLog: [],
+          appointments: [],
+          medications: [],
+          mentalHealthLog: [],
+          physicalHealthLog: [],
+        };
+        
+        setFamilyMembers(prevFamily => ({
+          ...prevFamily,
+          [newId]: newMember
+        }));
+        
+        setActiveMemberId(newId); // Switch to the new member
+        setCurrentView('profile'); // Open their profile to edit
+        setIsAddMemberModalOpen(false); // Close modal
+      };
+
+
+      return (
+        <Fragment>
+          <div className="flex flex-col md:flex-row h-screen w-full bg-amber-50 font-inter">
+            {/* --- Sidebar / Family Switcher --- */}
+            <FamilySwitcher
+              members={Object.values(familyMembers)}
+              activeId={activeMemberId}
+              onChange={setActiveMemberId}
+              onAddClick={() => setIsAddMemberModalOpen(true)}
+            />
+
+            {/* --- Main Content --- */}
+            <main className="flex-1 flex flex-col overflow-hidden">
+              <Header memberName={activeMember.name} />
+              
+              {/* --- View Navigation Tabs --- */}
+              <nav className="flex items-center border-b border-amber-200 bg-white px-4 md:px-8 overflow-x-auto">
+                <TabButton
+                  icon="user"
+                  label="Profile"
+                  isActive={currentView === 'profile'}
+                  onClick={() => setCurrentView('profile')}
+                />
+                <TabButton
+                  icon="apple"
+                  label="Nutrition"
+                  isActive={currentView === 'nutrition'}
+                  onClick={() => setCurrentView('nutrition')}
+                />
+                <TabButton
+                  icon="smile"
+                  label="Mental Health"
+                  isActive={currentView === 'mentalHealth'}
+                  onClick={() => setCurrentView('mentalHealth')}
+                />
+                <TabButton
+                  icon="heart"
+                  label="Physical Health"
+                  isActive={currentView === 'physicalHealth'}
+                  onClick={() => setCurrentView('physicalHealth')}
+                />
+                <TabButton
+                  icon="calendar"
+                  label="Appointments"
+                  isActive={currentView === 'appointments'}
+                  onClick={() => setCurrentView('appointments')}
+                />
+                <TabButton
+                  icon="pill"
+                  label="Medications"
+                  isActive={currentView === 'medications'}
+                  onClick={() => setCurrentView('medications')}
+                />
+                <TabButton
+                  icon="lightbulb"
+                  label="Diet Tips"
+                  isActive={currentView === 'dietTips'}
+                  onClick={() => setCurrentView('dietTips')}
+                />
+              </nav>
+
+              {/* --- Content Area --- */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8">
+                {currentView === 'profile' && (
+                  <ProfileView
+                    key={activeMember.id} // Add key to force re-mount on member change
+                    member={activeMember}
+                    onUpdate={handleUpdateProfile}
+                  />
+                )}
+                {currentView === 'nutrition' && (
+                  <NutritionView
+                    foodLog={activeMember.foodLog}
+                    onLogFood={handleLogFood}
+                    onDeleteFood={handleDeleteFood}
+                  />
+                )}
+                {currentView === 'mentalHealth' && (
+                  <MentalHealthView
+                    log={activeMember.mentalHealthLog}
+                    onLog={handleLogMentalHealth}
+                    onDelete={handleDeleteMentalHealth}
+                  />
+                )}
+                {currentView === 'physicalHealth' && (
+                  <PhysicalHealthView
+                    log={activeMember.physicalHealthLog}
+                    onLog={handleLogPhysicalHealth}
+                    onDelete={handleDeletePhysicalHealth}
+                    dailyStepsGoal={activeMember.profile.dailyStepsGoal || 8000}
+                  />
+                )}
+                {currentView === 'appointments' && (
+                  <AppointmentsView 
+                    appointments={activeMember.appointments}
+                    onDelete={handleDeleteAppointment}
+                    onAdd={handleAddAppointment}
+                  />
+                )}
+                {currentView === 'medications' && (
+                  <MedicationsView 
+                    medications={activeMember.medications}
+                    onDelete={handleDeleteMedication}
+                    onAdd={handleAddMedication}
+                  />
+                )}
+                {currentView === 'dietTips' && (
+                  <DietTipsView />
+                )}
+              </div>
+            </main>
+          </div>
+
+          {/* --- Add Member Modal --- */}
+          <AddMemberModal
+            isOpen={isAddMemberModalOpen}
+            onClose={() => setIsAddMemberModalOpen(false)}
+            onAdd={handleAddMember}
+          />
+          
+          {/* --- Medication Alert --- */}
+          {medicationAlert && (
+            <MedicationAlert
+              medicationName={medicationAlert.name}
+              onClose={() => setMedicationAlert(null)}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    // --- View-Specific Components ---
+
+    const ProfileStepIndicator = ({ currentStep, totalSteps }) => {
+      return (
+        <div className="flex items-center justify-center mb-6">
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
+            <React.Fragment key={step}>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                  step < currentStep
+                    ? 'bg-green-600 text-white'
+                    : step === currentStep
+                    ? 'bg-green-600 text-white'
+                    : 'bg-amber-100 text-green-700 border-2 border-amber-200'
+                }`}
+              >
+                {step < currentStep ? <Icon name="check-circle" className="w-[18px] h-[18px]" /> : step}
+              </div>
+              {step < totalSteps && (
+                <div className={`flex-1 h-1 ${step < currentStep ? 'bg-green-600' : 'bg-amber-200'}`} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      );
+    };
+
+    function ProfileView({ member, onUpdate }) {
+      const [currentStep, setCurrentStep] = useState(1);
+      const [formData, setFormData] = useState({
+        name: member.name,
+        physicalGoals: member.profile.physicalGoals,
+        healthIssues: member.profile.healthIssues,
+        dietaryPreferences: member.profile.dietaryPreferences || 'None',
+        activityLevel: member.profile.activityLevel || 'Moderate',
+        allergies: member.profile.allergies || 'None',
+        dailyStepsGoal: member.profile.dailyStepsGoal || 8000,
+      });
+      const [isSaved, setIsSaved] = useState(false);
+      const totalSteps = 4;
+
+      const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        setIsSaved(false); // Reset save status on change
+      };
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        onUpdate(formData);
+        setIsSaved(true);
+      };
+
+      const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+      const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+
+      const activityLevels = ['Sedentary (little to no exercise)', 'Light (light exercise/sports 1-3 days/week)', 'Moderate (moderate exercise/sports 3-5 days/week)', 'Active (hard exercise/sports 6-7 days/week)'];
+      const dietaryOptions = ['None', 'Vegetarian', 'Vegan', 'Gluten-Free', 'Keto', 'High Protein', 'Low Carb'];
+      const stepGoalOptions = [3000, 5000, 8000, 10000, 12000, 15000];
+
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900">Profile & Goals</h1>
+          <div className="bg-white p-6 rounded-xl shadow-lg space-y-6 max-w-2xl mx-auto">
+            <ProfileStepIndicator currentStep={currentStep} totalSteps={totalSteps} />
+
+            {/* --- Step 1: Basic Info --- */}
+            {currentStep === 1 && (
+              <div className="space-y-4 animate-fade-in">
+                <h2 className="text-xl font-semibold text-green-800">Basic Info</h2>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={member.avatar}
+                    alt={member.name}
+                    className="w-20 h-20 rounded-full border-4 border-amber-500"
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/100x100/7f7f7f/ffffff?text=?'; }}
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="name" className="block text-sm font-medium text-green-800">
+                      Full Name
+                    </label>
+                    <input
+                      id="name"
+                      name="name"
+                      type="text"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="mt-1 w-full px-4 py-2 text-lg border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="physicalGoals" className="block text-sm font-medium text-green-800">
+                    Physical Health Goals
+                  </label>
+                  <textarea
+                    id="physicalGoals"
+                    name="physicalGoals"
+                    value={formData.physicalGoals}
+                    onChange={handleChange}
+                    rows={4}
+                    placeholder="e.g., 'Run a 5k', 'Lower blood pressure'"
+                    className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* --- Step 2: Health Conditions --- */}
+            {currentStep === 2 && (
+              <div className="space-y-4 animate-fade-in">
+                <h2 className="text-xl font-semibold text-green-800">Health Background</h2>
+                <div>
+                  <label htmlFor="healthIssues" className="block text-sm font-medium text-green-800">
+                    Pre-existing Health Issues
+                  </label>
+                  <textarea
+                    id="healthIssues"
+                    name="healthIssues"
+                    value={formData.healthIssues}
+                    onChange={handleChange}
+                    rows={4}
+                    placeholder="e.g., 'Type 2 Diabetes', 'Asthma', 'Seasonal allergies', or 'None'"
+                    className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <p className="text-xs text-green-700 mt-1">This information helps in providing better tips and tracking.</p>
+                </div>
+                <div>
+                  <label htmlFor="allergies" className="block text-sm font-medium text-green-800">
+                    Allergies (Food, Medication, Other)
+                  </label>
+                  <textarea
+                    id="allergies"
+                    name="allergies"
+                    value={formData.allergies}
+                    onChange={handleChange}
+                    rows={3}
+                    placeholder="e.g., 'Peanuts', 'Penicillin', 'Pollen', or 'None'"
+                    className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* --- Step 3: Lifestyle --- */}
+            {currentStep === 3 && (
+              <div className="space-y-4 animate-fade-in">
+                <h2 className="text-xl font-semibold text-green-800">Lifestyle</h2>
+                <div>
+                  <label htmlFor="activityLevel" className="block text-sm font-medium text-green-800">
+                    Weekly Activity Level
+                  </label>
+                  <select
+                    id="activityLevel"
+                    name="activityLevel"
+                    value={formData.activityLevel}
+                    onChange={handleChange}
+                    className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    {activityLevels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="dietaryPreferences" className="block text-sm font-medium text-green-800">
+                    Dietary Preferences
+                  </label>
+                  <select
+                    id="dietaryPreferences"
+                    name="dietaryPreferences"
+                    value={formData.dietaryPreferences}
+                    onChange={handleChange}
+                    className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    {dietaryOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="dailyStepsGoal" className="block text-sm font-medium text-green-800">
+                    Daily Steps Goal
+                  </label>
+                  <select
+                    id="dailyStepsGoal"
+                    name="dailyStepsGoal"
+                    value={formData.dailyStepsGoal}
+                    onChange={handleChange}
+                    className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    {stepGoalOptions.map(option => (
+                      <option key={option} value={option}>{option.toLocaleString()} steps</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            
+            {/* --- Step 4: Review & Save --- */}
+            {currentStep === 4 && (
+               <div className="space-y-4 animate-fade-in">
+                 <h2 className="text-xl font-semibold text-green-800">Review & Save</h2>
+                 <div className="p-4 bg-green-50 border border-amber-200 rounded-lg space-y-3">
+                    <p><strong>Name:</strong> {formData.name}</p>
+                    <p><strong>Goals:</strong> {formData.physicalGoals || 'Not set'}</p>
+                    <p><strong>Conditions:</strong> {formData.healthIssues || 'Not set'}</p>
+                    <p><strong>Allergies:</strong> {formData.allergies || 'Not set'}</p>
+                    <p><strong>Activity:</strong> {formData.activityLevel}</p>
+                    <p><strong>Diet:</strong> {formData.dietaryPreferences}</p>
+                    <p><strong>Steps Goal:</strong> {(formData.dailyStepsGoal || 8000).toLocaleString()} steps</p>
+                 </div>
+                 <p className="text-sm text-green-700">Looking good? Save your profile. You can always come back and edit this later.</p>
+               </div>
+            )}
+            
+            {/* --- Navigation Buttons --- */}
+            <div className="flex items-center justify-between gap-4 pt-4 border-t border-amber-100">
+              <button
+                type="button"
+                onClick={prevStep}
+                disabled={currentStep === 1}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-200 text-amber-900 font-medium rounded-lg hover:bg-amber-300 transition-all disabled:opacity-50"
+              >
+                <Icon name="arrow-left" className="w-[18px] h-[18px]" />
+                Back
+              </button>
+              
+              {isSaved && currentStep === totalSteps && (
+                <span className="text-green-600 flex items-center gap-1">
+                  <Icon name="check-circle" className="w-[18px] h-[18px]" />
+                  Saved!
+                </span>
+              )}
+
+              {currentStep < totalSteps ? (
+                <button
+                  type="button"
+                  onClick={nextStep}
+                  className="flex items-center justify-center gap-2 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all"
+                >
+                  Next
+                  <Icon name="arrow-right" className="w-[18px] h-[18px]" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="flex items-center justify-center gap-2 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all"
+                >
+                  <Icon name="save" className="w-5 h-5" />
+                  Save Profile
+                </button>
+              )}
+            </div>
+          </div>
+        </Fragment>
+      );
+    }
+
+
+    function DietTipsView() {
+      const tips = [
+        { title: "Stay Hydrated", text: "Drink at least 8 glasses (64 ounces) of water per day. Water is essential for digestion, energy, and brain function." },
+        { title: "Eat a Rainbow", text: "Fill your plate with colorful fruits and vegetables. Different colors provide different essential vitamins and nutrients." },
+        { title: "Prioritize Protein", text: "Include a source of lean protein (like chicken, fish, beans, or tofu) with each meal to help you feel full and support muscle repair." },
+        { title: "Choose Whole Grains", text: "Opt for whole grains like oatmeal, brown rice, and whole-wheat bread over refined grains. They provide more fiber and nutrients." },
+        { title: "Mindful Eating", text: "Pay attention to your body's hunger and fullness cues. Eat slowly and savor your food, avoiding distractions like TV or phones." },
+        { title: "Limit Processed Foods", text: "Reduce your intake of foods that come in a box or bag, especially those high in added sugar, sodium, and unhealthy fats." },
+        { title: "Don't Fear Healthy Fats", text: "Incorporate healthy fats from sources like avocados, nuts, seeds, and olive oil. They are crucial for brain health and satisfaction." }
+      ];
+
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900 mb-6">Daily Diet Tips</h1>
+
+          {/* --- Generic Tips Section --- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tips.map((tip, index) => (
+              <div key={index} className="bg-white p-6 rounded-xl shadow-lg border border-amber-200">
+                <h2 className="text-xl font-semibold text-amber-700 mb-2">{tip.title}</h2>
+                <p className="text-green-800">{tip.text}</p>
+              </div>
+            ))}
+          </div>
+        </Fragment>
+      );
+    }
+
+
+    function NutritionView({ foodLog, onLogFood, onDeleteFood }) {
+      const totalCalories = useMemo(() => {
+        // Ensure calories are treated as numbers
+        return foodLog.reduce((sum, item) => sum + (Number(item.calories) || 0), 0);
+      }, [foodLog]);
+
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900">Nutrition Tracker</h1>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              {/* --- Re-instated Photo Nutrition Tracker Component --- */}
+              <NutritionTracker onLogFood={onLogFood} />
+            </div>
+            
+            {/* --- Daily Log Component --- */}
+            <FoodLog
+              log={foodLog}
+              totalCalories={totalCalories}
+              onDelete={onDeleteFood}
+            />
+          </div>
+        </Fragment>
+      );
+    }
+
+    function MentalHealthView({ log, onLog, onDelete }) {
+      const [mood, setMood] = useState('Happy');
+      const [note, setNote] = useState('');
+      const [isCrisisModalOpen, setIsCrisisModalOpen] = useState(false);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!note) {
+          console.warn("Please add a note.");
+          return;
+        }
+        onLog({ mood, note });
+        setNote('');
+        setMood('Happy');
+      };
+
+      const moods = ['Happy', 'Okay', 'Sad', 'Anxious', 'Tired', 'Stressed'];
+      const moodEmojis = {
+        'Happy': '😊',
+        'Okay': '😐',
+        'Sad': '😢',
+        'Anxious': '😟',
+        'Tired': '😴',
+        'Stressed': '😩',
+      };
+
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900">Mental Health Log</h1>
+
+          {/* --- CRISIS HELP BUTTON --- */}
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <Icon name="alert-triangle" className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="ml-3 flex-1 md:flex md:justify-between">
+                <p className="text-sm">
+                  If you are in crisis or need immediate support, please don't use this log.
+                </p>
+                <button
+                  onClick={() => setIsCrisisModalOpen(true)}
+                  className="mt-3 text-sm md:mt-0 md:ml-6 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold shadow-md hover:bg-red-700 transition-all"
+                >
+                  Get Help Now
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              {/* --- Corrected Mental Health Form --- */}
+              <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+                <h2 className="text-xl font-semibold text-green-900 mb-4">How are you feeling?</h2>
+                <div>
+                  <label className="block text-sm font-medium text-green-800 mb-2">Select Mood</label>
+                  <div className="flex flex-wrap gap-2">
+                    {moods.map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMood(m)}
+                        className={`p-3 rounded-lg border-2 transition-all ${mood === m ? 'border-amber-500 bg-amber-50' : 'border-amber-200'}`}
+                      >
+                        <span className="text-2xl" role="img" aria-label={m}>{moodEmojis[m]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="mental-note" className="block text-sm font-medium text-green-800 mb-1">
+                    Journal / Notes
+                  </label>
+                  <textarea
+                    id="mental-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={4}
+                    placeholder="What's on your mind?"
+                    className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 text-white font-semibold rounded-lg shadow-md hover:bg-amber-700 transition-all"
+                >
+                  <Icon name="plus" className="w-5 h-5" />
+                  Log Entry
+                </button>
+              </form>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg h-fit">
+              <h2 className="text-xl font-semibold text-green-900 mb-4">Recent Entries</h2>
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {log.length === 0 ? (
+                  <p className="text-green-700 text-center py-4">No entries yet.</p>
+                ) : (
+                  [...log].reverse().map(item => (
+                    <div key={item.id} className="relative p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <p className="font-medium text-green-900 text-lg">
+                        <span className="mr-2" role="img" aria-label={item.mood}>{moodEmojis[item.mood]}</span>
+                        {item.mood}
+                      </p>
+                      <p className="text-sm text-green-700 mb-1">{item.date}</p>
+                      <p className="text-green-800">{item.note}</p>
+                      <button 
+                        onClick={() => onDelete(item.id)}
+                        className="absolute top-2 right-2 p-1 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                        aria-label="Delete log entry"
+                      >
+                        <Icon name="trash-2" className="w-[18px] h-[18px]" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <CrisisHelpModal 
+            isOpen={isCrisisModalOpen}
+            onClose={() => setIsCrisisModalOpen(false)}
+          />
+        </Fragment>
+      );
+    }
+
+    // --- NEW: Daily Steps Summary Component ---
+    function DailyStepsSummary({ steps, goal }) {
+      const percent = goal > 0 ? Math.min((steps / goal) * 100, 100) : 0;
+      const circumference = 2 * Math.PI * 45; // 45 is radius
+      const offset = circumference - (percent / 100) * circumference;
+
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-lg">
+          <h2 className="text-xl font-semibold text-green-900 mb-4">Today's Steps</h2>
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-32 h-32">
+              <svg className="w-full h-full" viewBox="0 0 100 100">
+                {/* Background Circle */}
+                <circle
+                  className="text-amber-100"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  fill="transparent"
+                  r="45"
+                  cx="50"
+                  cy="50"
+                />
+                {/* Progress Circle */}
+                <circle
+                  className="text-green-600"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  fill="transparent"
+                  r="45"
+                  cx="50"
+                  cy="50"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  transform="rotate(-90 50 50)"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Icon name="footprints" className="w-6 h-6 text-green-700" />
+                <span className="text-2xl font-bold text-green-900">{steps.toLocaleString()}</span>
+                <span className="text-sm text-green-700">steps</span>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-green-700">
+                Goal: <span className="font-semibold text-green-800">{goal.toLocaleString()}</span>
+              </p>
+              {steps >= goal && (
+                <p className="font-semibold text-amber-600 mt-1">Goal Reached! 🎉</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+
+    function PhysicalHealthView({ log, onLog, onDelete, dailyStepsGoal }) {
+      const [type, setType] = useState('Activity');
+      const [title, setTitle] = useState('');
+      const [note, setNote] = useState('');
+      const [steps, setSteps] = useState('');
+
+      // --- Calculate total steps ---
+      const totalStepsToday = useMemo(() => {
+        const today = new Date().toLocaleDateString();
+        return log
+          .filter(item => item.date === today && item.type === 'Activity' && item.steps)
+          .reduce((sum, item) => sum + parseInt(item.steps || 0, 10), 0); // Added safety check for steps
+      }, [log]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!title || !note) {
+          console.warn("Please fill out all fields.");
+          return;
+        }
+        onLog({ type, title, note, steps: type === 'Activity' ? (steps || 0) : undefined });
+        setTitle('');
+        setNote('');
+        setSteps('');
+      };
+      
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900">Physical Health Log</h1>
+          
+          {/* --- NEW: Steps Summary Card --- */}
+          <DailyStepsSummary steps={totalStepsToday} goal={dailyStepsGoal} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+                <h2 className="text-xl font-semibold text-green-900 mb-4">Log Activity or Symptom</h2>
+                
+                <div>
+                  <label className="block text-sm font-medium text-green-800 mb-2">Log Type</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center">
+                      <input type="radio" name="logType" value="Activity" checked={type === 'Activity'} onChange={() => setType('Activity')} className="h-4 w-4 text-green-600 border-amber-300 focus:ring-green-500" />
+                      <span className="ml-2 text-green-800">Activity</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input type="radio" name="logType" value="Symptom" checked={type === 'Symptom'} onChange={() => setType('Symptom')} className="h-4 w-4 text-red-600 border-amber-300 focus:ring-red-500" />
+                      <span className="ml-2 text-green-800">Symptom</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="physical-title" className="block text-sm font-medium text-green-800 mb-1">
+                    {type === 'Activity' ? 'Activity Name' : 'Symptom'}
+                  </label>
+                  <input
+                    id="physical-title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={type === 'Activity' ? "e.g., 'Jogging'" : "e.g., 'Headache'"}
+                    className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                </div>
+
+                {/* --- NEW: Steps Field --- */}
+                {type === 'Activity' && (
+                  <div>
+                    <label htmlFor="physical-steps" className="block text-sm font-medium text-green-800 mb-1">
+                      Steps (Optional)
+                    </label>
+                    <input
+                      id="physical-steps"
+                      type="number"
+                      value={steps}
+                      onChange={(e) => setSteps(e.target.value)}
+                      placeholder="e.g., '5000'"
+                      className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <label htmlFor="physical-note" className="block text-sm font-medium text-green-800 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    id="physical-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={4}
+                    placeholder={type === 'Activity' ? "e.g., '3 miles in 30 minutes'" : "e.g., 'Started after lunch, mild pain.'"}
+                    className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-700 text-white font-semibold rounded-lg shadow-md hover:bg-green-800 transition-all"
+                >
+                  <Icon name="plus" className="w-5 h-5" />
+                  Log Entry
+                </button>
+              </form>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg h-fit">
+              <h2 className="text-xl font-semibold text-green-900 mb-4">Recent Entries</h2>
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {log.length === 0 ? (
+                  <p className="text-green-700 text-center py-4">No entries yet.</p>
+                ) : (
+                  [...log].reverse().map(item => (
+                    <div key={item.id} className="relative p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className={`font-medium text-lg ${item.type === 'Activity' ? 'text-green-800' : 'text-red-700'}`}>
+                            {item.title}
+                            <span className="ml-2 text-xs font-normal text-green-700 bg-green-200 px-2 py-0.5 rounded-full">{item.type}</span>
+                          </p>
+                          <p className="text-sm text-green-700 mb-1">{item.date}</p>
+                        </div>
+                        {/* --- NEW: Display steps --- */}
+                        {item.type === 'Activity' && item.steps && (
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className="font-bold text-green-700">{parseInt(item.steps, 10).toLocaleString()}</p>
+                            <p className="text-xs text-green-600">steps</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-green-800 mt-1">{item.note}</p>
+                      <button 
+                        onClick={() => onDelete(item.id)}
+                        className="absolute top-2 right-2 p-1 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                        aria-label="Delete log entry"
+                      >
+                        <Icon name="trash-2" className="w-[18px] h-[18px]" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </Fragment>
+      );
+    }
+
+
+    function AppointmentsView({ appointments, onAdd, onDelete }) {
+      const [type, setType] = useState('');
+      const [doctor, setDoctor] = useState('');
+      const [date, setDate] = useState('');
+      const [time, setTime] = useState('');
+      
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!type || !doctor || !date || !time) {
+          console.warn("Please fill out all appointment fields.");
+          return;
+        }
+        onAdd({ type, doctor, date, time });
+        // Reset form
+        setType('');
+        setDoctor('');
+        setDate('');
+        setTime('');
+      };
+
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900">Appointments</h1>
+          
+          {/* --- Add Appointment Form --- */}
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+            <h2 className="text-xl font-semibold text-green-900 mb-4">Schedule New Appointment</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="app-type" className="block text-sm font-medium text-green-800 mb-1">
+                  Appointment Type
+                </label>
+                <input
+                  id="app-type"
+                  type="text"
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  placeholder="e.g., 'Annual Check-up'"
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="app-doctor" className="block text-sm font-medium text-green-800 mb-1">
+                  Doctor
+                </label>
+                <input
+                  id="app-doctor"
+                  type="text"
+                  value={doctor}
+                  onChange={(e) => setDoctor(e.target.value)}
+                  placeholder="e.g., 'Dr. Smith'"
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="app-date" className="block text-sm font-medium text-green-800 mb-1">
+                  Date
+                </label>
+                <input
+                  id="app-date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="app-time" className="block text-sm font-medium text-green-800 mb-1">
+                  Time
+                </label>
+                <input
+                  id="app-time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 text-white font-semibold rounded-lg shadow-md hover:bg-amber-700 transition-all"
+            >
+              <Icon name="plus" className="w-5 h-5" />
+              Add Appointment
+            </button>
+          </form>
+          
+          {/* --- Appointments List --- */}
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <h2 className="text-xl font-semibold text-green-900 mb-4">Upcoming Appointments</h2>
+            {appointments.length === 0 ? (
+              <p className="text-green-700">No upcoming appointments scheduled.</p>
+            ) : (
+              <ul className="space-y-4">
+                {[...appointments].reverse().map(app => (
+                  <li key={app.id} className="flex items-center justify-between p-4 border border-amber-200 rounded-lg hover:shadow-md transition-shadow">
+                    <div>
+                      <p className="font-semibold text-lg text-amber-700">{app.type}</p>
+                      <p className="text-green-800">with {app.doctor}</p>
+                      <p className="text-green-700 text-sm">{app.date} at {app.time}</p>
+                    </div>
+                    <button 
+                      onClick={() => onDelete(app.id)} 
+                      className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                      aria-label="Delete appointment"
+                    >
+                      <Icon name="trash-2" className="w-5 h-5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Fragment>
+      );
+    }
+
+    function MedicationsView({ medications, onAdd, onDelete }) {
+      const [name, setName] = useState('');
+      const [dosage, setDosage] = useState('');
+      const [frequency, setFrequency] = useState('');
+      const [time, setTime] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name || !dosage || !frequency || !time) {
+          console.warn("Please fill out all medication fields.");
+          return;
+        }
+        onAdd({ name, dosage, frequency, time });
+        // Reset form
+        setName('');
+        setDosage('');
+        setFrequency('');
+        setTime('');
+      };
+      
+      // Helper to format 12-hour time for display
+      const formatTime = (time24) => {
+        if (!time24) return '';
+        const [hours, minutes] = time24.split(':');
+        const h = parseInt(hours);
+        const m = minutes;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12; // 0 becomes 12
+        return `${h12}:${m} ${ampm}`;
+      };
+
+      return (
+        <Fragment>
+          <h1 className="text-2xl font-bold text-green-900">Medications</h1>
+          
+          {/* --- Add Medication Form --- */}
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+            <h2 className="text-xl font-semibold text-green-900 mb-4">Add New Medication</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="med-name" className="block text-sm font-medium text-green-800 mb-1">
+                  Medication Name
+                </label>
+                <input
+                  id="med-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., 'Vitamin D'"
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
+              </div>
+              <div>
+                <label htmlFor="med-dosage" className="block text-sm font-medium text-green-800 mb-1">
+                  Dosage
+                </label>
+                <input
+                  id="med-dosage"
+                  type="text"
+                  value={dosage}
+                  onChange={(e) => setDosage(e.target.value)}
+                  placeholder="e.g., '1000 IU'"
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
+              </div>
+              <div>
+                <label htmlFor="med-frequency" className="block text-sm font-medium text-green-800 mb-1">
+                  Frequency
+                </label>
+                <input
+                  id="med-frequency"
+                  type="text"
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value)}
+                  placeholder="e.g., '1 per day'"
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
+              </div>
+              <div>
+                <label htmlFor="med-time" className="block text-sm font-medium text-green-800 mb-1">
+                  Alarm Time
+                </label>
+                <input
+                  id="med-time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-700 text-white font-semibold rounded-lg shadow-md hover:bg-green-800 transition-all"
+            >
+              <Icon name="plus" className="w-5 h-5" />
+              Add Medication
+            </button>
+          </form>
+
+          {/* --- Medications List --- */}
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <h2 className="text-xl font-semibold text-green-900 mb-4">Current Medications</h2>
+            {medications.length === 0 ? (
+              <p className="text-green-700">No medications listed.</p>
+            ) : (
+              <ul className="space-y-4">
+                {[...medications].reverse().map(med => (
+                  <li key={med.id} className="flex items-center justify-between p-4 border border-amber-200 rounded-lg hover:shadow-md transition-shadow">
+                    <div>
+                      <p className="font-semibold text-lg text-green-700">{med.name}</p>
+                      <p className="text-green-800">Dosage: {med.dosage}</p>
+                      <p className="text-green-700 text-sm">Frequency: {med.frequency}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {med.time && (
+                        <div className="flex items-center gap-1 text-sm text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                          <Icon name="clock" className="w-[14px] h-[14px]" />
+                          <span>{formatTime(med.time)}</span>
+                        </div>
+                      )}
+                      <button 
+                        onClick={() => onDelete(med.id)} 
+                        className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                        aria-label="Delete medication"
+                      >
+                        <Icon name="trash-2" className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Fragment>
+      );
+    }
+
+
+    // --- Reusable Components ---
+
+    function Header({ memberName }) {
+      return (
+        <header className="flex-shrink-0 bg-white h-16 md:h-20 border-b border-amber-200 flex items-center justify-between px-4 md:px-8">
+          <h1 className="text-xl md:text-2xl font-bold text-green-900">
+            Welcome, <span className="text-green-600">{memberName}</span>
+          </h1>
+          <div className="flex items-center gap-2">
+            <button className="p-2 rounded-full text-green-700 hover:bg-green-50">
+              <Icon name="user" className="w-6 h-6" />
+            </button>
+          </div>
+        </header>
+      );
+    }
+
+    function FamilySwitcher({ members, activeId, onChange, onAddClick }) {
+      return (
+        <aside className="w-full md:w-64 bg-green-800 text-green-100 p-4 md:p-6 flex-shrink-0">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+            <Icon name="shield-check" className="w-6 h-6 mr-3 text-amber-400" />
+            Famwell
+          </h2>
+          <nav className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-hidden pb-2 md:pb-0">
+            {members.map(member => (
+              <button
+                key={member.id}
+                onClick={() => onChange(member.id)}
+                className={`flex items-center w-full min-w-max md:min-w-0 p-3 rounded-lg text-left transition-all ${
+                  activeId === member.id
+                    ? 'bg-green-600 text-white shadow-lg'
+                    : 'hover:bg-green-700 hover:text-white'
+                }`}
+              >
+                <img
+                  src={member.avatar}
+                  alt={member.name}
+                  className="w-10 h-10 rounded-full mr-3 border-2 border-green-500"
+                  onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/100x100/7f7f7f/ffffff?text=?'; }}
+                />
+                <span className="font-medium">{member.name}</span>
+              </button>
+            ))}
+            {/* --- Add Member Button --- */}
+            <button
+              onClick={onAddClick}
+              className="flex items-center justify-center w-full min-w-max md:min-w-0 p-3 rounded-lg text-left transition-all border-2 border-dashed border-green-600 text-green-200 hover:bg-green-700 hover:text-white mt-2"
+            >
+              <Icon name="plus" className="w-5 h-5 mr-2" />
+              Add Member
+            </button>
+          </nav>
+        </aside>
+      );
+    }
+
+    function TabButton({ icon, label, isActive, onClick }) {
+      return (
+        <button
+          onClick={onClick}
+          className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-all ${
+            isActive
+              ? 'border-green-600 text-green-600'
+              : 'border-transparent text-gray-500 hover:text-green-900'
+          }`}
+        >
+          <Icon name={icon} className="w-5 h-5" />
+          <span>{label}</span>
+        </button>
+      );
+    }
+
+    // --- MODIFIED: NutritionTracker ---
+    function NutritionTracker({ onLogFood }) {
+      const [foodDesc, setFoodDesc] = useState('');
+      const [analysis, setAnalysis] = useState(null);
+      const [isLoading, setIsLoading] = useState(false);
+      const [calcError, setCalcError] = useState(null);
+      
+      // NEW: State for photo preview
+      const [image, setImage] = useState(null);
+      const [imagePreview, setImagePreview] = useState(null);
+      
+      // NEW: Handle file change
+      const handleFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          setImage(file);
+          setImagePreview(URL.createObjectURL(file));
+          
+          // NEW LOGIC: Use filename as food description
+          const cleanName = file.name
+            .toLowerCase()
+            .replace(/\.(jpg|jpeg|png|webp)$/, '') // Remove extension
+            .replace(/_|-/g, ' '); // Replace _ or - with space
+          
+          setFoodDesc(cleanName); // Set the text input
+          
+          setAnalysis(null); // Clear old analysis
+          setCalcError(null); // Clear old errors
+        }
+      };
+
+      // This function replaces the API call.
+      const handleCalculate = (e) => {
+        e.preventDefault();
+        if (!foodDesc) {
+          setCalcError("Please add a description or upload a photo.");
+          return;
+        }
+        
+        setIsLoading(true);
+        setAnalysis(null);
+        setCalcError(null);
+
+        // Simulate a "thinking" process
+        setTimeout(() => {
+          // Clean the description (which might be a filename)
+          const desc = foodDesc
+            .toLowerCase()
+            .replace(/\.(jpg|jpeg|png|webp)$/, '') // Remove extension
+            .replace(/_|-/g, ' '); // Replace _ or - with space
+            
+          const foundFoods = [];
+          
+          let total = {
+            name: [],
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fats: 0
+          };
+
+          // Loop through our local database
+          for (const key in foodDatabase) {
+            if (desc.includes(key)) {
+              const food = foodDatabase[key];
+              foundFoods.push(food);
+              total.calories += food.calories;
+              total.protein += food.protein;
+              total.carbs += food.carbs;
+              total.fats += food.fats;
+              total.name.push(food.name);
+            }
+          }
+
+          setIsLoading(false);
+
+          if (foundFoods.length > 0) {
+            // Create a summary name
+            total.name = total.name.join(' + ');
+            setAnalysis(total);
+          } else {
+            // No food found
+            setCalcError("Sorry, I don't have that food in my local database. Try simple names like 'roti' or 'dal'.");
+          }
+
+        }, 500); // 0.5 second delay to feel like it's "calculating"
+      };
+
+      const handleSubmitLog = () => {
+        if (analysis) {
+          onLogFood(analysis);
+          // Reset form
+          setFoodDesc('');
+          setAnalysis(null);
+          setCalcError(null);
+          setImage(null);
+          setImagePreview(null);
+          document.getElementById('photo-upload').value = null; // Clear file input
+        }
+      };
+
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-lg">
+          <h2 className="text-xl font-semibold text-green-900 mb-4">Log a Meal</h2>
+          
+          <form onSubmit={handleCalculate} className="space-y-4">
+            
+            {/* --- NEW: Photo Upload --- */}
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <label
+                htmlFor="photo-upload"
+                className="relative flex-shrink-0 w-full sm:w-32 h-32 border-2 border-dashed border-amber-300 rounded-lg flex flex-col items-center justify-center text-gray-500 hover:border-green-500 hover:text-green-500 cursor-pointer transition-all bg-green-50"
+              >
+                {imagePreview ? (
+                  <Fragment>
+                    <img src={imagePreview} alt="Food preview" className="w-full h-full object-cover rounded-lg" />
+                     <button
+                        type="button"
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          setImage(null); 
+                          setImagePreview(null); 
+                          setFoodDesc(''); // Also clear desc
+                          document.getElementById('photo-upload').value = null; // Clear file input
+                        }}
+                        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow-lg"
+                      >
+                        <Icon name="x" className="w-4 h-4" />
+                      </button>
+                  </Fragment>
+                ) : (
+                  <Fragment>
+                    <Icon name="camera" className="w-8 h-8" />
+                    <span className="mt-2 text-sm font-medium">Add Photo</span>
+                  </Fragment>
+                )}
+              </label>
+              <input
+                id="photo-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {/* --- Food Description --- */}
+              <div className="w-full">
+                <label htmlFor="food-desc" className="block text-sm font-medium text-green-800 mb-1">
+                  Food Description
+                </label>
+                <input
+                  id="food-desc"
+                  type="text"
+                  value={foodDesc}
+                  onChange={(e) => { 
+                    setFoodDesc(e.target.value); 
+                    // Clear photo if user types manually
+                    if(imagePreview) {
+                      setImage(null);
+                      setImagePreview(null);
+                      document.getElementById('photo-upload').value = null;
+                    }
+                  }}
+                  placeholder="e.g., 'roti and dal' or 'banana and egg'"
+                  className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-xs text-green-700 mt-1">
+                  Type a description or upload a photo to use its filename.
+                </p>
+              </div>
+            </div>
+
+            {/* --- Calculate Button --- */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all disabled:bg-gray-400"
+            >
+              {isLoading ? (
+                <Icon name="rotate-cw" className="w-5 h-5 animate-spin" />
+              ) : (
+                <Icon name="calculator" className="w-5 h-5" />
+              )}
+              {isLoading ? 'Calculating...' : 'Calculate Nutrition'}
+            </button>
+          </form>
+
+          {/* --- Calculation Error Display --- */}
+          {calcError && !isLoading && (
+            <div className="mt-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-lg">
+              <p><span className="font-semibold">Error:</span> {calcError}</p>
+            </div>
+          )}
+
+          {/* --- Calculation Result --- */}
+          {analysis && !isLoading && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="font-semibold text-lg text-green-800 mb-3">Calculation Complete!</h3>
+              <p className="text-sm text-green-700 mb-2 font-medium">For: <span className="font-bold text-green-800">{analysis.name}</span></p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <NutritionStat label="Calories" value={analysis.calories.toFixed(0)} unit="kcal" />
+                <NutritionStat label="Protein" value={analysis.protein.toFixed(1)} unit="g" />
+                <NutritionStat label="Carbs" value={analysis.carbs.toFixed(1)} unit="g" />
+                <NutritionStat label="Fats" value={analysis.fats.toFixed(1)} unit="g" />
+              </div>
+              <button
+                onClick={handleSubmitLog}
+                className="w-full flex items-center justify-center gap-2 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all"
+              >
+                <Icon name="plus" className="w-5 h-5" />
+                Log This Meal
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function FoodLog({ log, totalCalories, onDelete }) {
+      return (
+        <div className="bg-white p-6 rounded-xl shadow-lg h-fit">
+          <h2 className="text-xl font-semibold text-green-900 mb-4">Today's Log</h2>
+          <div className="mb-4 text-center">
+            <p className="text-sm text-green-700">Total Calories</p>
+            <p className="text-4xl font-bold text-green-600">{totalCalories.toFixed(0)}</p>
+          </div>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {log.length === 0 ? (
+              <p className="text-green-700 text-center py-4">No meals logged yet today.</p>
+            ) : (
+              [...log].reverse().map(item => (
+                <div key={item.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div>
+                    <p className="font-medium text-green-900">{item.name}</p>
+                    <p className="text-sm text-green-700">{Number(item.calories).toFixed(0)} kcal</p>
+                  </div>
+                  <button 
+                    onClick={() => onDelete(item.id)}
+                    className="p-1 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                    aria-label="Delete log entry"
+                  >
+                    <Icon name="trash-2" className="w-[18px] h-[18px]" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function NutritionStat({ label, value, unit }) {
+      return (
+        <div className="text-center bg-white p-3 rounded-lg border border-amber-200">
+          <p className="text-sm font-medium text-green-700">{label}</p>
+          <p className="text-xl font-bold text-green-900">{value}</p>
+          <p className="text-xs text-green-700">{unit}</p>
+        </div>
+      );
+    }
+
+    // --- Modal Components ---
+    function AddMemberModal({ isOpen, onClose, onAdd }) {
+      const [name, setName] = useState('');
+
+      if (!isOpen) return null;
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim()) {
+          onAdd(name.trim());
+          setName('');
+        }
+      };
+
+      return (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={onClose}
+        >
+          <div 
+            className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()} // Prevent modal close on content click
+          >
+            <h2 className="text-xl font-semibold text-green-900 mb-4">Add New Family Member</h2>
+            <form onSubmit={handleSubmit}>
+              <div>
+                <label htmlFor="new-member-name" className="block text-sm font-medium text-green-800">
+                  Full Name
+                </label>
+                <input
+                  id="new-member-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., 'Jane Doe'"
+                  className="mt-1 w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  autoFocus
+                />
+              </div>
+              <div className="flex items-center justify-end gap-4 mt-6">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-amber-200 text-amber-900 font-medium rounded-lg hover:bg-amber-300 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all"
+                >
+                  <Icon name="save" className="w-5 h-5 mr-2 inline" />
+                  Save Member
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function MedicationAlert({ medicationName, onClose }) {
+      return (
+        <div className="fixed top-6 right-6 z-50 w-full max-w-sm bg-white p-4 rounded-xl shadow-2xl border border-amber-200 animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 p-2 bg-amber-100 text-amber-700 rounded-full">
+              <Icon name="bell" className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-green-900">Medication Reminder</h3>
+              <p className="text-green-800">
+                It's time to take your <span className="font-bold">{medicationName}</span>.
+              </p>
+            </div>
+            <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+              <Icon name="x" className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // --- New Crisis Help Modal ---
+    function CrisisHelpModal({ isOpen, onClose }) {
+      if (!isOpen) return null;
+
+      const helplines = [
+        { name: "KIRAN (Mental Health Rehabilitation)", number: "1800-599-0019" },
+        { name: "Vandrevala Foundation Helpline", number: "1860-266-2345" },
+        { name: "National Emergency Number", number: "112" },
+      ];
+
+      const therapists = [
+        { name: "Dr. Anjali Sharma", specialty: "Clinical Psychologist", address: "123, MG Road, New Delhi" },
+        { name: "MindWell Clinic", specialty: "CBT & Therapy", address: "45, Linking Road, Mumbai" },
+        { name: "Inner Peace Center", specialty: "Mindfulness & Stress", address: "78, Koramangala, Bengaluru" },
+      ];
+
+      return (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={onClose}
+        >
+          <div 
+            className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <h2 className="text-2xl font-bold text-red-800">Mental Health Crisis Support</h2>
+              <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+                <Icon name="x" className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* --- URGENT DISCLAIMER --- */}
+            <div className="mt-4 p-4 bg-red-50 border border-red-300 text-red-900 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Icon name="alert-triangle" className="w-6 h-6 text-red-600" />
+                <h3 className="text-lg font-semibold">This is not an emergency service.</h3>
+              </div>
+              <p className="mt-2">
+                If you or someone you know is in immediate danger, please call your local emergency number (like <strong>112</strong> in India or <strong>911</strong> in the US) or go to the nearest hospital.
+              </p>
+            </div>
+
+            {/* --- National Helplines --- */}
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-green-900 mb-2">National Helplines (India)</h3>
+              <div className="space-y-3">
+                {helplines.map(line => (
+                  <div key={line.name} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div>
+                      <p className="font-medium text-green-800">{line.name}</p>
+                      <p className="text-lg font-bold text-green-900">{line.number}</p>
+                    </div>
+                    <a href={`tel:${line.number.replace(/-/g, '')}`} className="p-3 bg-green-600 text-white rounded-full shadow-md hover:bg-green-700">
+                      <Icon name="phone" className="w-5 h-5" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* --- Simulated Local Help --- */}
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-green-900 mb-2">Find Local Therapists (Demonstration)</h3>
+              <p className="text-sm text-green-700 mb-3">In a full version of this app, this section would use your location to find nearby, verified professionals.</p>
+
+              <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+                {therapists.map(t => (
+                  <div key={t.name} className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <p className="font-semibold text-amber-800">{t.name}</p>
+                    <p className="text-sm text-green-800">{t.specialty}</p>
+                    <p className="text-xs text-green-700">{t.address}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+    
+    // --- Mount the App ---
+    root.render(React.createElement(App));
+    
+  </script>
+</body>
+</html>
